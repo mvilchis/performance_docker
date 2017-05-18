@@ -1,6 +1,6 @@
 #! /usr/bin/bash
 
-POSTGRES_CONTAINER="postgres-prueba-rp"
+POSTGRES_CONTAINER="postgres-rp"
 RAPIDPRO_CONTAINER="rapidpro-prueba-rp"
 REDIS_CONTAINER="redis-prueba-rp"
 PATH_RAPIDPRO="./rapidpro"
@@ -27,9 +27,9 @@ function  create_postgres(){
     echo "Imagen postgres-rp creada"
   fi
 
-  is_running=`docker ps --format "{{.Names}}"|grep "${POSTGRES_CONTAINER}"`
+  is_running=`docker ps -a --format "{{.Names}}"|grep "${POSTGRES_CONTAINER}"`
   if [ -z "$is_running" ]; then
-    docker run --name $POSTGRES_CONTAINER -m $POSTGRES_MEM -e TEMBAPASSWD=supersecret -d postgres-rp ||{
+    docker run --name $POSTGRES_CONTAINER -e TEMBAPASSWD=supersecret -d postgres-rp ||{
       echo "$POSTGRES_CONTAINER error"
     }
     sleep 20s
@@ -40,7 +40,7 @@ function  create_postgres(){
     docker exec -i  $POSTGRES_CONTAINER psql -U postgres <<EOF
     $remove_temba
     $create_temba
-    EOF
+EOF
     docker exec -i  $POSTGRES_CONTAINER   bash <<EOF
     su postgres
     psql
@@ -92,10 +92,10 @@ function main() {
     "--postgres")
       create_postgres;
       connect_containers;
-      sleep 10s;
-      docker stats $POSTGRES_CONTAINER  | grep -v "CPU" >> performance_postgres &
-      docker stats $RAPIDPRO_CONTAINER  | grep -v "CPU" >> performance_rapidpro &
-      nohup python prueba_estres.py &> mensajes_aceptados;
+      #sleep 10s;
+      #docker stats $POSTGRES_CONTAINER  | grep -v "CPU" >> performance_postgres &
+      #docker stats $RAPIDPRO_CONTAINER  | grep -v "CPU" >> performance_rapidpro &
+      #nohup python prueba_estres.py &> mensajes_aceptados;
       shift;;
     "--rapidpro")
       connect_containers;

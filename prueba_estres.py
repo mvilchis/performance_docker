@@ -3,24 +3,29 @@ import grequests
 import datetime
 
 
-s = sched.scheduler(time.time, time.sleep)
 
-def do_something(sc):
-    url = 'http://127.0.0.1:8000/handlers/external/received/4cd4708c-ea6a-4904-95cc-13b89b39aab7/?sender=%s&message=%s&ts=%d&id=%s'
+def do_something():
+    start_time = time.time()
+    url = 'http://127.0.0.1:8000/handlers/kannel/receive/b469a31f-0e79-438a-b28d-9a64f398ffb7/?backend=%i&sender={SENDER}&message={MESSAGE}&ts={TIME}&id={ID}&to={TO}"'
 
     datas = []
-    for i in range(100):
-
-        url_tmp = url%(str(i),  datetime.datetime.now().strftime('%H:%M:%S'), 1, 4212341234)
+    for i in range(500):
+        url_tmp = url.format(SENDER=str(i),
+                            MESSAGE="trigger",
+                            TIME=1,
+                            ID=4212341234,
+                            TO=12345)
         datas.append(url_tmp)
     rs = (grequests.post(url) for url in datas)
     lista =  grequests.map(rs)
-    for i in lista:
-        if i:
-            print (i.status_code, i.content)
-        else:
-            print "Nada"
-    s.enter(60, 1, do_something, (sc,))
+    print time.time() - start_time
+    with open("mensajes_raw", "a") as myfile:
+        for i in lista:
+            if i:
+                myfile.write(str(i.status_code)+ ","+str(i.content)+"\n")
+            else:
+                myfile.write("Nada\n")
 
-s.enter(60, 1, do_something, (s,))
-s.run()
+while True:
+    do_something()
+    time.sleep(60)

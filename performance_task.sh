@@ -1,10 +1,11 @@
 #! /usr/bin/bash
 
-POSTGRES_CONTAINER="postgres-rp"
+POSTGRES_CONTAINER="postgres-prueba-rp"
 RAPIDPRO_CONTAINER="rapidpro-prueba-rp"
+CELERY_CONTAINER="rp-celery-rp"
 REDIS_CONTAINER="redis-prueba-rp"
 PATH_RAPIDPRO="./rapidpro"
-
+RAPIPRO_IMAGE="rapidpro:v1.4.20"
 ##########################################################
 #             Remove all old dockers
 function remove  {
@@ -29,7 +30,7 @@ function  create_postgres(){
 
   is_running=`docker ps -a --format "{{.Names}}"|grep "${POSTGRES_CONTAINER}"`
   if [ -z "$is_running" ]; then
-    docker run --name $POSTGRES_CONTAINER -e TEMBAPASSWD=supersecret -d postgres-rp ||{
+    docker run --name $POSTGRES_CONTAINER --memory=$POSTGRES_MEM -e TEMBAPASSWD=supersecret -d postgres-rp ||{
       echo "$POSTGRES_CONTAINER error"
     }
     sleep 20s
@@ -52,7 +53,7 @@ EOF
 }
 
 function connect_containers() {
-  result=`docker images --format "{{.Repository}}:{{.Tag}}" | grep "rapidpro-prueba:latest"`
+  result=`docker images --format "{{.Repository}}:{{.Tag}}" | grep "$RAPIPRO_IMAGE"`
   if [ -z "$result" ]; then
     docker build -t rapidpro-prueba $PATH_RAPIDPRO
   else
@@ -70,8 +71,25 @@ function connect_containers() {
     -e EMAIL_HOST_USER=rapidpro@email.com \
     -e EMAIL_HOST_PASSWORD=supersecret \
     -e DEFAULT_LANGUAGE=es \
-    -e SEND_WEBHOOKS \
-    -e SEND_MESSAGES=True -p 8000:8000 -d rapidpro-prueba
+    -e SEND_WEBHOOKS=True  \
+    -e SECRET_KEY=supersecret \
+    -e CONTAINER_INIT=start_rapidpro.sh \
+    -e SEND_MESSAGES=True -p 8000:8000 -d $RAPIPRO_IMAGE
+  else
+    echo "$RAPIDPRO_CONTAINER corriendo"
+  fi
+  is_running=`docker ps --format "{{.Names}}"|grep "${CELERY_CONTAINER}"`
+  if [ -z "$is_running" ]; then
+    docker run  --name $CELERY_CONTAINER --link $POSTGRES_CONTAINER:postgres --link $REDIS_CONTAINER:redis \
+    -e SEND_MAIL=True \
+    -e DEBUG=False \
+    -e EMAIL_HOST_USER=rapidpro@email.com \
+    -e EMAIL_HOST_PASSWORD=supersecret \
+    -e DEFAULT_LANGUAGE=es \
+    -e SEND_WEBHOOKS=True  \
+    -e SECRET_KEY=supersecret \
+    -e CONTAINER_INIT=start_celery.sh \
+    -e SEND_MESSAGES=True -p 5555:5555 -d $RAPIPRO_IMAGE
   else
     echo "$RAPIDPRO_CONTAINER corriendo"
   fi
@@ -92,10 +110,10 @@ function main() {
     "--postgres")
       create_postgres;
       connect_containers;
-      #sleep 10s;
-      #docker stats $POSTGRES_CONTAINER  | grep -v "CPU" >> performance_postgres &
-      #docker stats $RAPIDPRO_CONTAINER  | grep -v "CPU" >> performance_rapidpro &
-      #nohup python prueba_estres.py &> mensajes_aceptados;
+      sleep 10s;
+      docker stats $POSTGRES_CONTAINER  | grep -v "CPU" >> performance_postgres &
+      docker stats $RAPIDPRO_CONTAINER  | grep -v "CPU" >> performance_rapidpro &
+      nohup python prueba_estres.py &> mensajes_aceptados;
       shift;;
     "--rapidpro")
       connect_containers;

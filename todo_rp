@@ -1,0 +1,15 @@
+etc, postgres, 9.5, main. postgresql.conf 
+línea 71...
+
+*--->MAX_CONECTIONS= 10, -> 200
+
+*---> Monitoreo por relic, para docker. 
+*-- Podría ser -> Sacar a postgres y dedicarle una maquina. 
+*-- Muy a futuro-> Memory workes, buffers.  
+
+
+Buenas practicas, tener indices, bien hechos.  
+
+
+#Consumo de ram. 
+

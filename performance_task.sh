@@ -2,10 +2,15 @@
 
 POSTGRES_CONTAINER="postgres-prueba-rp"
 RAPIDPRO_CONTAINER="rapidpro-prueba-rp"
-CELERY_CONTAINER="rp-celery-rp"
+CELERYB_CONTAINER="celery-beat-rp"
+CELERYH_CONTAINER="celery-handler-rp"
+CELERYF_CONTAINER="celery-flow-rp"
+CELERYM_CONTAINER="celery-msgs-rp"
+
+
 REDIS_CONTAINER="redis-prueba-rp"
 PATH_RAPIDPRO="./rapidpro"
-RAPIPRO_IMAGE="rapidpro:v1.4.20"
+RAPIPRO_IMAGE="mvilchis/rapidpro:v1.4.20"
 ##########################################################
 #             Remove all old dockers
 function remove  {
@@ -52,6 +57,28 @@ EOF
   fi
 }
 
+function init_celery() {
+  celery_name="$1"
+  celery_flags="$2"
+  is_running=`docker ps --format "{{.Names}}"|grep "${celery_name}"`
+  if [ -z "$is_running" ]; then
+    docker run  --name $celery_name --link $POSTGRES_CONTAINER:postgres --link $REDIS_CONTAINER:redis \
+    -e SEND_MAIL=True \
+    -e DEBUG=False \
+    -e EMAIL_HOST_USER=rapidpro@email.com \
+    -e EMAIL_HOST_PASSWORD=supersecret \
+    -e DEFAULT_LANGUAGE=es \
+    -e SEND_WEBHOOKS=True  \
+    -e SECRET_KEY=supersecret \
+    -e CONTAINER_INIT=start_celery.sh \
+    -e SEND_MESSAGES=True \
+     $celery_flags -d $RAPIPRO_IMAGE
+  else
+    echo "$RAPIDPRO_CONTAINER corriendo"
+  fi
+
+}
+
 function connect_containers() {
   result=`docker images --format "{{.Repository}}:{{.Tag}}" | grep "$RAPIPRO_IMAGE"`
   if [ -z "$result" ]; then
@@ -78,22 +105,11 @@ function connect_containers() {
   else
     echo "$RAPIDPRO_CONTAINER corriendo"
   fi
-  is_running=`docker ps --format "{{.Names}}"|grep "${CELERY_CONTAINER}"`
-  if [ -z "$is_running" ]; then
-    docker run  --name $CELERY_CONTAINER --link $POSTGRES_CONTAINER:postgres --link $REDIS_CONTAINER:redis \
-    -e SEND_MAIL=True \
-    -e DEBUG=False \
-    -e EMAIL_HOST_USER=rapidpro@email.com \
-    -e EMAIL_HOST_PASSWORD=supersecret \
-    -e DEFAULT_LANGUAGE=es \
-    -e SEND_WEBHOOKS=True  \
-    -e SECRET_KEY=supersecret \
-    -e CONTAINER_INIT=start_celery.sh \
-    -e SEND_MESSAGES=True -p 5555:5555 -d $RAPIPRO_IMAGE
-  else
-    echo "$RAPIDPRO_CONTAINER corriendo"
-  fi
-}
+   init_celery $CELERYB_CONTAINER "-e CELERY_BEAT=True -e CELERY_WORKERS=8  -p 5555:5555"
+   init_celery $CELERYH_CONTAINER "-e CELERY_WORKERS=8  -e CELERY_QUEUE=handler"
+   init_celery $CELERYF_CONTAINER "-e CELERY_WORKERS=6  -e CELERY_QUEUE=flows"
+   init_celery $CELERYM_CONTAINER "-e CELERY_WORKERS=12 -e CELERY_QUEUE=msgs"
+  }
 
 
 function main() {
